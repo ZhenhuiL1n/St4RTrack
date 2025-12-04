@@ -36,7 +36,9 @@ class CroCoNet(nn.Module):
                  pos_embed='cosine',     # positional embedding (either cosine or RoPE100)
                  arch_mode = 'VanillaDust3r',
                  rope_mode = 'full_3d',
-                 seq_mode='NA'
+                 seq_mode='NA',
+                 lora_r=0,
+                 lora_alpha=1.0,
                 ):
                 
         super(CroCoNet, self).__init__()
@@ -83,7 +85,7 @@ class CroCoNet(nn.Module):
         self._set_mask_token(dec_embed_dim)
 
         # decoder 
-        self._set_decoder(enc_embed_dim, dec_embed_dim, dec_num_heads, dec_depth, mlp_ratio, norm_layer, norm_im2_in_dec)
+        self._set_decoder(enc_embed_dim, dec_embed_dim, dec_num_heads, dec_depth, mlp_ratio, norm_layer, norm_im2_in_dec, lora_r, lora_alpha)
         
         # prediction head 
         self._set_prediction_head(dec_embed_dim, patch_size)
@@ -100,15 +102,21 @@ class CroCoNet(nn.Module):
     def _set_mask_token(self, dec_embed_dim):
         self.mask_token = nn.Parameter(torch.zeros(1, 1, dec_embed_dim))
         
-    def _set_decoder(self, enc_embed_dim, dec_embed_dim, dec_num_heads, dec_depth, mlp_ratio, norm_layer, norm_im2_in_dec):
+    def _set_decoder(self, enc_embed_dim, dec_embed_dim, dec_num_heads, dec_depth, mlp_ratio, norm_layer, norm_im2_in_dec, lora_r, lora_alpha):
         self.dec_depth = dec_depth
         self.dec_embed_dim = dec_embed_dim
         # transfer from encoder to decoder 
         self.decoder_embed = nn.Linear(enc_embed_dim, dec_embed_dim, bias=True)
         # transformer for the decoder 
-        self.dec_blocks = nn.ModuleList([
-            DecoderBlock(dec_embed_dim, dec_num_heads, mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=norm_layer, norm_mem=norm_im2_in_dec, rope=self.rope_dec, arch_mode=self.arch_mode, rope_mode=self.rope_mode)
-            for i in range(dec_depth)])
+        if lora_r > 0:
+            from models.blocks import LoRA_DecoderBlock
+            self.dec_blocks = nn.ModuleList([
+                LoRA_DecoderBlock(dec_embed_dim, dec_num_heads, mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=norm_layer, norm_mem=norm_im2_in_dec, rope=self.rope_dec, r=lora_r, alpha=lora_alpha)
+                for i in range(dec_depth)])
+        else:
+            self.dec_blocks = nn.ModuleList([
+                DecoderBlock(dec_embed_dim, dec_num_heads, mlp_ratio=mlp_ratio, qkv_bias=True, norm_layer=norm_layer, norm_mem=norm_im2_in_dec, rope=self.rope_dec, arch_mode=self.arch_mode, rope_mode=self.rope_mode)
+                for i in range(dec_depth)])
         # final norm layer 
         self.dec_norm = norm_layer(dec_embed_dim)
         

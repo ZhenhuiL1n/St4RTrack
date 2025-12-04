@@ -71,10 +71,14 @@ class AsymmetricCroCo3DStereo (
                  patch_embed_cls='PatchEmbedDust3R',  # PatchEmbedDust3R or ManyAR_PatchEmbed
                  arch_mode = 'VanillaDust3r',
                  rope_mode = 'full_3d', #full_3d, mix_3d
+                 lora_r=0,
+                 lora_alpha=1.0,
                  **croco_kwargs):
         
         croco_kwargs['arch_mode'] = arch_mode
         croco_kwargs['rope_mode'] = rope_mode
+        croco_kwargs['lora_r'] = lora_r
+        croco_kwargs['lora_alpha'] = lora_alpha
         self.patch_embed_cls = patch_embed_cls
         self.croco_args = fill_default_args(croco_kwargs, super().__init__)
         super().__init__(**croco_kwargs)
