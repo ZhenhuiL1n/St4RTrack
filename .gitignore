@@ -1,0 +1,6 @@
+__pycache__/
+checkpoints/
+eval_benchmark
+results/
+all_videos_rotated/
+concatenated_results/

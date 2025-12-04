@@ -1,0 +1,1 @@
+python infer.py --input_dir /home/longnhat/Lin_workspace/8TB2/Lin/PhDprojects/Sotaas/St4RTrack/eval_benchmark/DNA_Seq/DNA_random.mp4  --weights /home/longnhat/Lin_workspace/8TB2/Lin/PhDprojects/Sotaas/St4RTrack/checkpoints/St4RTrack_Seqmode_reweightMax5.pth --output_dir results/squared --batch_size 48
