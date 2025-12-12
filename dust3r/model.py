@@ -312,4 +312,5 @@ class AsymmetricCroCo3DStereo (
             res2 = self._downstream_head(2, [tok.float() for tok in dec2], shape2)
     
         res2['pts3d_in_other_view'] = res2.pop('pts3d')  # predict view2's pts3d in view1's frame
+
         return res1, res2

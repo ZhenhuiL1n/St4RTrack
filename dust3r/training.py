@@ -155,7 +155,7 @@ def load_model(args, device):
     model = eval(args.model)
     model.to(device)
     model_without_ddp = model
-    print("Model = %s" % str(model_without_ddp))
+    # print("Model = %s" % str(model_without_ddp))
     if args.pretrained and not args.resume:
         print('Loading pretrained: ', args.pretrained)
         ckpt = torch.load(args.pretrained, map_location=device, weights_only=False)
@@ -800,7 +800,8 @@ def tta_eval_epoch(args, model_without_ddp, device, epoch):
                 start_frame=0,
                 step_size=1,
                 fps=0,
-                num_frames=len(seq["files"])
+                num_frames=len(seq["files"]),
+                square_ok=True  # Allow 512x512 output
             )
     
     print(f"TTA evaluation completed for epoch {epoch}. Results saved to {epoch_output_dir}")

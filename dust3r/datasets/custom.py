@@ -37,8 +37,6 @@ def intrinsics_to_pixel_space(intrinsics: np.ndarray, resolution: Tuple[int, int
     cx_pixel = cx * W
     cy_pixel = cy * H
 
-
-
     # Construct the pixel space intrinsics matrix
     pixel_intrinsics = np.array([
         [fx_pixel, 0, cx_pixel],
@@ -186,6 +184,12 @@ class CustomDUSt3R(BaseStereoViewDataset):
         return len(self.rgb_paths)
 
     def _get_views(self, index, resolution=(512, 288), rng=None):
+
+        # print(f"DEBUG: CustomDUSt3R._get_views called with resolution={resolution}")
+        # if resolution != (512, 512):
+        #     print(f"WARNING: Resolution {resolution} is not (512, 512). Forcing (512, 512) for TTA.")
+        #     resolution = (512, 512)
+        
         rgb_path = self.rgb_paths[index]
         depth_path = self.depth_paths[index]
         depth = self.depth_data[depth_path]  # Use pre-loaded depth data
@@ -238,8 +242,6 @@ class CustomDUSt3R(BaseStereoViewDataset):
             # resize image to the same size as depth
             rgb_image = cv2.resize(rgb_image, (size_depth[1], size_depth[0]))
 
-        
-
             rgb_image, depth_map, intrinsics, _ = cropping.rescale_image_depthmap_crop(
                 rgb_image, depth_map, intrinsics, resolution)
 
@@ -249,8 +251,6 @@ class CustomDUSt3R(BaseStereoViewDataset):
             if i == 0:
                 rgb_image_0 = rgb_image.copy()
                 intrinsics_0 = torch.from_numpy(intrinsics).clone()
-
-        
 
             views1['img'][i] = self.transform(rgb_image_0)
             views1['camera_intrinsics'][i] = intrinsics_0
@@ -267,6 +267,9 @@ class CustomDUSt3R(BaseStereoViewDataset):
             views2['supervised_label'][i] = supervised_label
             views2['pts3d_moge'][i] = torch.from_numpy(pts3d)
             views2['valid_mask'][i] = torch.from_numpy(valid_mask)
+
+        # print("==============> <========================= here you mf")
+        # import pdb; pdb.set_trace()
 
         return views1, views2
 

@@ -22,6 +22,7 @@ except:
 from .megasam_delta import MegasamDeltaDUSt3R  # noqa
 from .kubrick import KubrickDUSt3R  # noqa
 from .custom import CustomDUSt3R  # noqa
+from .dna import DNADataset  # noqa
 
 def get_data_loader(dataset, batch_size, num_workers=8, shuffle=True, drop_last=True, pin_mem=True):
     import torch
@@ -29,7 +30,11 @@ def get_data_loader(dataset, batch_size, num_workers=8, shuffle=True, drop_last=
 
     # pytorch dataset
     if isinstance(dataset, str):
+        dataset_str = dataset
         dataset = eval(dataset) 
+        print(f"DEBUG: Parsed dataset string: '{dataset_str}' -> Type: {type(dataset)}", force=True)
+        if hasattr(dataset, 'dataset'):
+            print(f"DEBUG: Inner dataset type: {type(dataset.dataset)}", force=True)
     world_size = get_world_size()
     rank = get_rank()
 

@@ -4,3 +4,9 @@ eval_benchmark
 results/
 all_videos_rotated/
 concatenated_results/
+vis_moge_depth
+data/DNA_Seq
+train_results/
+datasets_preprocess/DNA_Rendering
+Davis_data
+train_TTA_results
