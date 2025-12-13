@@ -102,6 +102,7 @@ class CustomDUSt3R(BaseStereoViewDataset):
     def __init__(self, # only keyword arguments
                  dataset_location = "./Davis_data/DAVIS/JPEGImages/480p/rollerblade/",
                  depth_path = "./Davis_data/DAVIS/JPEGImages/480p/rollerblade/depth",
+                 depth_filename = "moge_results.npy",  # Use 'moge_calibrated.npy' for metric depth
                  S=16,
                  stride=2,
                  clip_step=1,  # Added clip_step parameter
@@ -116,6 +117,7 @@ class CustomDUSt3R(BaseStereoViewDataset):
         self.dataset_label = 'Custom'
         self.dataset_location = dataset_location
         self.depth_path = depth_path
+        self.depth_filename = depth_filename
         os.makedirs(self.depth_path, exist_ok=True)
         self.S = S
         self.stride = stride
@@ -126,6 +128,7 @@ class CustomDUSt3R(BaseStereoViewDataset):
             self.sequences = self.sequences[200:500]
 
         print(f"Found {len(self.sequences)} sequences")
+        print(f"Using depth file: {self.depth_filename}")
 
         self.rgb_paths = []
         self.depth_paths = []
@@ -133,7 +136,7 @@ class CustomDUSt3R(BaseStereoViewDataset):
         self.depth_data = {}  # New: store loaded depth data
 
         for seq in tqdm(self.sequences):
-            depth_path = os.path.join(self.depth_path, seq.split('/')[-2] + f"moge_results.npy")
+            depth_path = os.path.join(self.depth_path, seq.split('/')[-2] + self.depth_filename)
             rgb_paths = (sorted(glob.glob(os.path.join(seq, "*.jpg"))) + sorted(glob.glob(os.path.join(seq, "*.png"))))
             if num_frames is not None:
                 rgb_paths = rgb_paths[:num_frames]

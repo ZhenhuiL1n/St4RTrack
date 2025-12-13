@@ -10,3 +10,4 @@ train_results/
 datasets_preprocess/DNA_Rendering
 Davis_data
 train_TTA_results
+TTA_output

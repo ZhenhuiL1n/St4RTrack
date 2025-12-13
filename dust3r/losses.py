@@ -181,6 +181,18 @@ def compute_scale_invariant_depth_loss(pred_depth, gt_depth, epsilon=1e-8):
     depth_loss = F.mse_loss(scaled_pred_depth, gt_depth)
     return depth_loss
 
+def compute_scale_aware_depth_loss(pred_depth, gt_depth, epsilon=1e-8):
+    """
+    Compute a scale-aware depth loss - direct MSE without any scale normalization.
+    Use this when gt_depth is in metric scale (e.g., calibrated with GT foreground).
+    
+    This forces the model to output depth at the correct metric scale.
+    """
+    # Direct MSE - no alpha scaling
+    depth_loss = F.mse_loss(pred_depth, gt_depth)
+    return depth_loss
+
+
 def Sum(*losses_and_masks):
     loss, mask = losses_and_masks[0]
     if loss.ndim > 0:
@@ -443,7 +455,8 @@ class ConfLoss(MultiLoss):
     def __init__(self, pixel_loss, alpha=1, velo_weight=1, pose_weight=0, traj_weight=0, align3d_weight=0,
                  depth_weight=0, arap_weight=0., pred_intrinsics=False,
                  cotracker=False, normal_weight=0, intr_inv_loss=False, 
-                pair_mode=False, reweight_mode=None, reweight_scale=-1):
+                pair_mode=False, reweight_mode=None, reweight_scale=-1,
+                metric_depth=False, metric_depth_weight=0):  # NEW: separate weight for scale-aware loss
         
         super().__init__()
         assert alpha > 0
@@ -457,8 +470,11 @@ class ConfLoss(MultiLoss):
         self.arap_weight = arap_weight
         self.normal_weight = normal_weight
         self.intr_inv_loss = intr_inv_loss
+        self.metric_depth = metric_depth  # Flag to replace scale-invariant with scale-aware
+        self.metric_depth_weight = metric_depth_weight  # NEW: Weight for scale-aware loss (used with depth_weight for dual loss)
 
-        if self.pose_weight != 0 or traj_weight != 0 or depth_weight != 0:
+        # Use scale-aware loss if metric_depth=True OR metric_depth_weight > 0
+        if self.pose_weight != 0 or traj_weight != 0 or depth_weight != 0 or metric_depth_weight != 0:
             self.pose_loss = CameraLoss(pred_intrinsics=pred_intrinsics)
         self.cotracker = cotracker
         if self.cotracker:
@@ -713,7 +729,7 @@ class ConfLoss(MultiLoss):
                 distance_head1_head2 = (pts3d_head1_overtime[valid_mask] - pts3d_head2_overtime[valid_mask]).norm(dim=-1)
                 align3d_loss += distance_head1_head2.mean()  # eq10 in paper
 
-        # Depth loss
+        # Depth loss (scale-invariant)
         depth_loss = 0
         if self.depth_weight != 0:
             depth_mask = gt2['valid_mask']
@@ -724,7 +740,25 @@ class ConfLoss(MultiLoss):
                 pred_depth = pred_depth_full[i][mask_i]
                 gt_depth   = gt_depth_full[i][mask_i]
                 if pred_depth.numel() > 0:
-                    depth_loss += compute_scale_invariant_depth_loss(pred_depth, gt_depth) # eq9 in paper
+                    # If metric_depth=True, replace scale-invariant with scale-aware
+                    if self.metric_depth:
+                        depth_loss += compute_scale_aware_depth_loss(pred_depth, gt_depth)
+                    else:
+                        depth_loss += compute_scale_invariant_depth_loss(pred_depth, gt_depth) # eq9 in paper
+
+        # Metric depth loss (scale-aware) - separate weight for dual loss
+        metric_depth_loss = 0
+        if self.metric_depth_weight != 0:
+            depth_mask = gt2['valid_mask']
+            if not hasattr(self, '_pred_depth_cached'):
+                pred_depth_full = self.pose_loss.get_depth_head2(gt2, pred1, pred2, pred_poses)
+                gt_depth_full   = self.pose_loss.get_depth_head2_gt(gt2)
+            for i in range(pred_depth_full.size(0)):
+                mask_i = depth_mask[i]
+                pred_depth = pred_depth_full[i][mask_i]
+                gt_depth   = gt_depth_full[i][mask_i]
+                if pred_depth.numel() > 0:
+                    metric_depth_loss += compute_scale_aware_depth_loss(pred_depth, gt_depth)
 
         arap_loss = 0
         if self.arap_weight > 0:
@@ -739,6 +773,7 @@ class ConfLoss(MultiLoss):
                      + self.pose_weight * conf_loss1_pose \
                      + self.traj_weight * track_loss \
                      + self.depth_weight * depth_loss \
+                     + self.metric_depth_weight * metric_depth_loss \
                      + self.arap_weight * arap_loss \
                      + self.normal_weight * normal_loss \
                      + self.align3d_weight * align3d_loss
@@ -749,6 +784,7 @@ class ConfLoss(MultiLoss):
             conf_loss_1_velo=float(conf_loss1_velo),
             loss_traj_2d=float(track_loss),
             loss_depth=float(depth_loss),
+            loss_metric_depth=float(metric_depth_loss),  # NEW: log metric depth loss
             loss_arap=float(arap_loss),
             loss_normal=float(normal_loss),
             loss_align3d=float(align3d_loss),
