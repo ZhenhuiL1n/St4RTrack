@@ -24,4 +24,5 @@ depth_filename='moge_calibrated.npy')" \
 --train_criterion "ConfLoss(Regr3D(L21, norm_mode='avg_dis'), alpha=0.2, velo_weight=1, pose_weight=0, \
 depth_weight=10.0, traj_weight=0.5, intr_inv_loss=True, pred_intrinsics=True, \
 cotracker=True, align3d_weight=5.0, metric_depth_weight=2.0)" \
---output_dir "./train_TTA_results/${seq_name}_512_metric_depth"
+--output_dir "./results/TTA/${seq_name}_512_metric_depth__reproduce"
+ 

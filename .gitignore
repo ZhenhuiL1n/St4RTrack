@@ -11,3 +11,8 @@ datasets_preprocess/DNA_Rendering
 Davis_data
 train_TTA_results
 TTA_output
+*.ply
+data/DNA_infer/
+infer_results/
+reproduction/
+train_Geometry_results/

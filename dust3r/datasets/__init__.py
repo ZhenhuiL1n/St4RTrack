@@ -22,7 +22,8 @@ except:
 from .megasam_delta import MegasamDeltaDUSt3R  # noqa
 from .kubrick import KubrickDUSt3R  # noqa
 from .custom import CustomDUSt3R  # noqa
-from .dna import DNADataset  # noqa
+from .dna import DNADataset, DNAMultiSeqDataset, DNASingleSeqDataset  # noqa
+from .dna_multiview_batch import DNAMultiViewBatchDataset, DNAMultiViewSampler  # noqa
 
 def get_data_loader(dataset, batch_size, num_workers=8, shuffle=True, drop_last=True, pin_mem=True):
     import torch

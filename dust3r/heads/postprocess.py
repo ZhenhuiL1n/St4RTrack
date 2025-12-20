@@ -41,7 +41,10 @@ def reg_dense_depth(xyz, mode):
         return xyz * d.square()
 
     if mode == 'exp':
-        return xyz * torch.expm1(d)
+        # Clamp d to prevent expm1 overflow (exp(88) overflows float32)
+        # NOTE: here there is a nasty clamp to avoid the explosion and make the training stable
+        d_clamped = d.clamp(max=20.0)  # exp(20) ~ 5e8, safe
+        return xyz * torch.expm1(d_clamped)
 
     raise ValueError(f'bad {mode=}')
 

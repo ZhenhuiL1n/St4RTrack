@@ -537,8 +537,13 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         loss_value = float(loss)
 
         if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value), force=True)
-            sys.exit(1)
+            print("Loss is {}, skipping batch".format(loss_value), force=True)
+            del loss
+            del batch
+            del batch_result
+            optimizer.zero_grad()
+            continue  # Skip instead of exit
+
 
         loss /= accum_iter
         loss_scaler(loss, optimizer, parameters=model.parameters(), clip_grad = 0.8 if args.grad_clip else None,

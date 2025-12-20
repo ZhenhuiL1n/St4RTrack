@@ -456,7 +456,7 @@ class ConfLoss(MultiLoss):
                  depth_weight=0, arap_weight=0., pred_intrinsics=False,
                  cotracker=False, normal_weight=0, intr_inv_loss=False, 
                 pair_mode=False, reweight_mode=None, reweight_scale=-1,
-                metric_depth=False, metric_depth_weight=0):  # NEW: separate weight for scale-aware loss
+                metric_depth=False, metric_depth_weight=0, bg_depth_weight=0):  # NEW: bg_depth_weight for background MoGe
         
         super().__init__()
         assert alpha > 0
@@ -471,10 +471,11 @@ class ConfLoss(MultiLoss):
         self.normal_weight = normal_weight
         self.intr_inv_loss = intr_inv_loss
         self.metric_depth = metric_depth  # Flag to replace scale-invariant with scale-aware
-        self.metric_depth_weight = metric_depth_weight  # NEW: Weight for scale-aware loss (used with depth_weight for dual loss)
+        self.metric_depth_weight = metric_depth_weight  # Weight for scale-aware foreground loss
+        self.bg_depth_weight = bg_depth_weight  # NEW: Weight for background MoGe depth (scale-invariant)
 
         # Use scale-aware loss if metric_depth=True OR metric_depth_weight > 0
-        if self.pose_weight != 0 or traj_weight != 0 or depth_weight != 0 or metric_depth_weight != 0:
+        if self.pose_weight != 0 or traj_weight != 0 or depth_weight != 0 or metric_depth_weight != 0 or bg_depth_weight != 0:
             self.pose_loss = CameraLoss(pred_intrinsics=pred_intrinsics)
         self.cotracker = cotracker
         if self.cotracker:
@@ -504,7 +505,9 @@ class ConfLoss(MultiLoss):
         return f'ConfLoss({self.pixel_loss})'
 
     def get_conf_log(self, x):
-        return x, torch.log(x)
+        # Clamp confidence to prevent explosion (conf >> 1 causes log(conf) >> 0)
+        x_clamped = torch.clamp(x, min=0.01, max=100.0)
+        return x_clamped, torch.log(x_clamped)
 
     def compute_loss(self, gt1, gt2, pred1, pred2, **kw):
         """
@@ -760,6 +763,25 @@ class ConfLoss(MultiLoss):
                 if pred_depth.numel() > 0:
                     metric_depth_loss += compute_scale_aware_depth_loss(pred_depth, gt_depth)
 
+        # Background depth loss (scale-invariant) - weak supervision using MoGe depth
+        bg_depth_loss = 0
+        if self.bg_depth_weight != 0:
+            # Check if moge_depth and bg_mask are available in gt2
+            if 'moge_depth' in gt2 and 'bg_mask' in gt2:
+                bg_mask = gt2['bg_mask']
+                moge_depth_full = gt2['moge_depth']
+                # Get predicted depth (reuse from above if available)
+                if not hasattr(self, '_pred_depth_cached'):
+                    pred_depth_full = self.pose_loss.get_depth_head2(gt2, pred1, pred2, pred_poses)
+                for i in range(pred_depth_full.size(0)):
+                    mask_i = bg_mask[i] & (moge_depth_full[i] > 0)  # Valid background pixels
+                    if mask_i.sum() > 0:
+                        pred_depth = pred_depth_full[i][mask_i]
+                        moge_depth = moge_depth_full[i][mask_i]
+                        if pred_depth.numel() > 0:
+                            # Use scale-invariant loss for background (weaker supervision)
+                            bg_depth_loss += compute_scale_invariant_depth_loss(pred_depth, moge_depth)
+
         arap_loss = 0
         if self.arap_weight > 0:
             rand_offset = torch.randint(0, 4, (1,), device=pred1['pts3d'].device)[0]
@@ -774,6 +796,7 @@ class ConfLoss(MultiLoss):
                      + self.traj_weight * track_loss \
                      + self.depth_weight * depth_loss \
                      + self.metric_depth_weight * metric_depth_loss \
+                     + self.bg_depth_weight * bg_depth_loss \
                      + self.arap_weight * arap_loss \
                      + self.normal_weight * normal_loss \
                      + self.align3d_weight * align3d_loss
@@ -784,7 +807,8 @@ class ConfLoss(MultiLoss):
             conf_loss_1_velo=float(conf_loss1_velo),
             loss_traj_2d=float(track_loss),
             loss_depth=float(depth_loss),
-            loss_metric_depth=float(metric_depth_loss),  # NEW: log metric depth loss
+            loss_metric_depth=float(metric_depth_loss),
+            loss_bg_depth=float(bg_depth_loss),  # NEW: log background depth loss
             loss_arap=float(arap_loss),
             loss_normal=float(normal_loss),
             loss_align3d=float(align3d_loss),
@@ -801,7 +825,7 @@ class Regr3D_ShiftInv (Regr3D):
         gt_pts1, gt_pts2, pred_pts1, pred_pts2, mask1, mask2, monitoring = \
             super().get_all_pts3d(gt1, gt2, pred1, pred2)
 
-        # compute median depth
+        # compute median depthß
         gt_z1, gt_z2 = gt_pts1[..., 2], gt_pts2[..., 2]
         pred_z1, pred_z2 = pred_pts1[..., 2], pred_pts2[..., 2]
         gt_shift_z = get_joint_pointcloud_depth(gt_z1, gt_z2, mask1, mask2)[:, None, None]

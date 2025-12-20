@@ -32,6 +32,6 @@ dataset_location='${data_root}')" \
 --train_criterion "ConfLoss(Regr3D(L21, norm_mode=''), alpha=0.2, velo_weight=0, pose_weight=0, \
 depth_weight=10.0, traj_weight=0.0, intr_inv_loss=True, pred_intrinsics=True,\
 cotracker=False, align3d_weight=5.0)" \
---output_dir "./train_Geometry_results/${output_name}_Absolute" \
+--output_dir "./train_Geometry_results/${output_name}_fixed" \
 --world_size 1 \
 --num_workers 0 # Set to 0 to enable pdb debugging in main process

@@ -147,7 +147,7 @@ def get_reconstructed_scene(
     num_frames=200,
     dynamic_mask_path=None,
     mid_anchor=False,
-    square_ok=False
+    square_ok=True
 ):
     assert batch_size > 1, "Batch size must be greater than 1"
     """
